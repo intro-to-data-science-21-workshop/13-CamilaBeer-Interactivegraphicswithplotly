@@ -1,0 +1,253 @@
+---
+title: "Live_Workshop_Camila_Rodrigo"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+setwd("~/Documents/Maestria/2021-II/Intro Data Science/Workshop")
+
+library(plotly) #installing libraries
+library(tidyverse)
+library(dplyr)
+library(haven)
+
+
+
+wgi_df<-haven::read_dta("wgidataset.dta") #Upload World Governance Indicators
+wb_classification<-readr::read_csv("WB_Classification.csv") #upload world bank regions
+
+names(wgi_df)[1] <- "wb_code" #change names to easy the merge
+
+wgi_df<-wgi_df%>%
+  left_join(wb_classification) #leftmerge
+
+wgi_df2019<-wgi_df%>%
+  filter(year==2019) #take values of 2019
+```
+
+#1. Introduction
+
+In this session we will build upon the basis of what we explained on the workshop video as a way to create more complex graphs. The first graph we will do is a 3d graph. Although not usually recommended to do under standard guidelines of data visualization, when enhanced with interactivity most of its interpretability limitations are overcame. The second graph will be how to build an interactive map using plotly and the different ways it can be done. 
+
+#2. Building a 3d graph
+
+##2a. Installing and loading data library
+
+The database we are going to use is about police killings and belongs to the Guardian. It was compiled  through media coverage, reader submissions and open-source data. It includes information about state, cities, demographics, and details on the situation such as cause of death and whether the victim was armed or not.
+
+Please download this package for the practice material:
+
+-You can use either: install.packages('fivethirtyeightdata', repos = 'https://fivethirtyeightdata.github.io/drat/', type = 'source')
+#library(fivethirtyeightdata)
+
+-Or by installing the package "fivethirtyeight".
+
+The original datacomes from the fivethirtyeight package using the police_killings specific data set.  See more under the following webpage: https://fivethirtyeight.com/features/where-police-have-killed-americans-in-2015/
+
+
+```{r cars}
+
+install.packages("fivethirtyeight")
+
+library(fivethirtyeight)
+library(fivethirtyeightdata)
+
+
+```
+
+
+## 2b. Creating variables for analysis
+We are going to work with Western states in the USA
+```{r}
+#View(police_killings) 
+
+western_states <- c("OR", "WA", "ID", "MT", "WY", "CA", "HI", "AK", "CO", "NM", "UT", "AZ", "NV")
+```
+
+Our focus is going to be race, age, cause of death, and race variables
+
+```{r}
+killed_bypolice <- police_killings %>%
+  filter(state %in% western_states) %>%
+  select(raceethnicity, cause, armed, age)
+
+#To remove NAs in our analytical sample, we can create dummies
+
+killed_bypolice$raceethnicity[which(killed_bypolice$raceethnicity == 0)] <- 'White'
+killed_bypolice$raceethnicity[which(killed_bypolice$raceethnicity == 1)] <- 'Black'
+killed_bypolice$raceethnicity[which(killed_bypolice$raceethnicity == 1)] <- 'Hispanic/Latino'
+killed_bypolice$raceethnicity[which(killed_bypolice$raceethnicity == 1)] <- 'Asian/Pacific Islander'
+killed_bypolice$raceethnicity[which(killed_bypolice$raceethnicity == 1)] <- 'Native American'
+killed_bypolice$raceethnicity<- as.factor(killed_bypolice$raceethnicity)
+```
+
+1) Plot your 3D plotly graph by using plotly (data frame, x =~ Var, y =~ Var2, z =~Var3, color=~Var, colors = c (you can use a palette codes or only call them by their names, i.e. 'yellow'))
+
+```{r}
+fig <- plot_ly(killed_bypolice, x = ~armed, y = ~cause, z = ~age, color = ~raceethnicity)
+```
+
+2)By default, plotly provides scatter markers, but we need to specify the trace when we are going to plot 3D graphs 
+```{r}
+ 
+fig <- fig %>% add_markers()
+
+#3)Now we can work with the layout to specify our titles
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'Armed'),
+                     yaxis = list(title = 'Cause of Death'),
+                     zaxis = list(title = 'Age')))
+fig
+```
+3)Let´s change the colour and size of the title
+Create vectors with a list of arguments: family, size, color which would be used once we finish with the first figure output.
+
+```{r}
+t <- list(                          #for your title 
+  family = "Times New Roman",
+  size = 10,
+  color = "grey")
+
+fig<- fig %>%layout(title = "<b>Americans killed by police in 2015 by race, age and being armed<b>", font=t)#to make it bold "<b>"
+fig
+```
+4)Do you want to add a label for the legend? 
+
+```{r}
+t1 <- list(
+  family = "sans serif",#You can use different fonts (Arial, times roman) 
+  size = 12,
+  color = toRGB("grey50"))
+
+ fig <- fig %>% layout(legend=list(title=list(text='<b> Enthnicity categories </b>',font=t1)))
+ fig
+```
+
+#3.  Building a map
+
+
+##3.1. Getting the data ready
+
+In this example we are going to make an interactive map of World Bank's corruption estimates. For this purpose, we need to update the database we have already been using and adding the latitude and longitude. This may be done with a World Development Indicators database, as seen below.   
+
+```{r}
+
+#install.packages("WDI") #installing the World development
+library(WDI) #loading the World Development Indicators library
+
+a<-WDI::WDI_data #the data is a list made itself of two lists, the second contains longitud and latitude
+db <- a[[2]] #we are going to use the second part 
+
+db<-as.data.frame(db)
+names(db)[3] <- "countryname"
+
+wgi_df2019_b<-wgi_df2019%>%
+  left_join(db) #leftmerge 
+
+#we merge the database
+
+```
+
+We also standardize the values from 1 to 10 as to facilitate the interpretation of the map. 
+
+```{r}
+
+min_cce<-(-2.5)
+max_cce<-(+2.5)
+
+wgi_df2019_b<-wgi_df2019_b%>%
+  mutate(cce_minmax=(cce-min_cce)/(max_cce-min_cce))%>%
+  mutate(cce_minmax=cce_minmax*10)
+```
+
+
+##3.2. First map with plot_geo
+
+<i>Plot geo</i> is one of the integrated map solutions that are included on the plotly package. This function contains maps into which it is possible to geo-referentiate a type of scatterplot. 
+
+The first element to consider are what is the database that is to be mapped and which coordinates to use. This is saved into an specific object. In this case we use our new dataset with the coordinates that we got via the WDI package.  
+
+```{r}
+
+wgi_df2019_b<-wgi_df2019_b%>%
+  filter(!is.na(wb_region))
+
+fig <- plot_geo(wgi_df2019_b, lat = ~latitude, lon = ~longitude)
+```
+
+The second element that we need to specify are the specific elements that the map is going to use, such as the color and what is going to be displayed. 
+
+
+```{r}
+
+g <- list(
+  showland=TRUE,
+  landcolor = toRGB("grey"), #the ToRgb helps us transform to hexadecimal
+  countrywidth = 0.5,
+  subunitwidth = 0.5
+)
+
+```
+
+We need to add the specific markers of this "scatterplot" such as the text that is going to be displayed (in this case the country name and the corruption estimate), the symbol that is going to be used, the size and what is going to be shown in the hover information. 
+
+```{r}
+fig <- fig %>% add_markers(
+    text = ~paste(countryname, round(cce_minmax,2), sep = "<br />"),
+    color = ~wb_region, symbol = I("square"), size = I(8), hoverinfo = "text"
+  )
+```
+
+Finally, we need to define the layout, this is the title and the properties we defined before. 
+
+```{r}
+fig <- fig %>% layout(
+    title = 'Corruption estimates World Bank<br />(Hover for country)', 
+    geo = g
+  )
+
+fig
+```
+##3.2. Second map with plot_mapbox
+
+The second way of doing the above, but more precise, is by using <i>plot_mapbox</i> function.  To do this, however, we need first to get a token for an API. 
+
+First, we need to get the token. This is done by suscribing in "ttps://account.mapbox.com/". Many properties are free, such as this one. Once you have a suscription it will give a unique number to be used. This should be submitted to R System.
+
+```{r}
+
+#Run the following line without coment:
+
+Sys.setenv('MAPBOX_TOKEN'='pk.eyJ1Ijoicm9kcmlnb2JvbGFub3NzIiwiYSI6ImNrdmMwcm00cTJyZnYyb2x1bHR0OWFvYmEifQ.43JvfLb3553_JljM9zOgtg')
+
+```
+
+Second, we set the <i>plot_mapbox</i> on a very similar way than before, by setting the database and the latitude and longitude. We also first filtrate the database once again in order to avoid NA on the income variable. 
+
+```{r}
+wgi_df2019_b<-wgi_df2019_b%>%  
+  filter(!is.na(income))
+
+fig2<-plot_mapbox(wgi_df2019_b, lat = ~latitude, lon = ~longitude)
+```
+
+Thirdly we run the figugre by defining which color to use, what is the text going to show and the hover information. 
+
+```{r}
+fig2<-fig2 %>% add_markers(
+    color = ~income,
+    text = ~paste(countryname, ",Corruption Estimate:" ,round(cce_minmax,2)),
+    hoverinfo = "text"
+  )
+
+fig2
+```
+
+
+
+
+

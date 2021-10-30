@@ -1,0 +1,332 @@
+---
+title: "Workshop Plotly"
+subtitle: "The making of interactive graphs" 
+author: "Cami1992 & RodrigoBolanosS"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: pygments
+    number_sections: no
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: True
+      smooth_scroll: True
+    toc_depth: 2
+    keep_md: true
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA,
+                      fig.align = "center")
+
+```
+
+# 0. Setting up the ground
+
+Before properly starting with an explanation of Plotly, on the following section we
+will <b>install all the packages needed</b> and <b>load the databases</b> that will allow us to build the graphs. 
+
+The packages we will use will be <i>plotly</i>, <i>tidyverse</i>, <i>lubridate</i>, and <i>readxl</i>.The databases  we will use are the <a href= "https://info.worldbank.org/governance/wgi/"> World Governance Indicators <a/> and the classification of regions of the <b>World Bank</b>.  This data is meant to <b>measure different degrees of governance</b> of countries such as control of corruption, rule of law, government effectiveness, to mention just a few.  
+
+On the other hand, we will use demographic data the <a href="https://www.humanfertility.org/"> Human Fertility Database </a> by the <b>Max Planck Institute</b> for Demographic Research (Germany) and Vienna Institute of Demography (Austria). Also we will use the data provided by <a href="https://ec.europa.eu/eurostat"> Eurostat </a> regarding fertility rates and employment. The aim of both these datasets is to have a <b>better grasp the behavior the fertility rates</b> of different countries of the world and its possibly relations with other economic and social variables. 
+
+
+```{r}
+setwd("~/Documents/Maestria/2021-II/Intro Data Science/Workshop")
+
+library(plotly) #installing libraries
+library(tidyverse)
+library(lubridate)
+library(readxl)
+
+wgi_df<-haven::read_dta("wgidataset.dta") #Upload World Governance Indicators
+wb_classification<-readr::read_csv("WB_Classification.csv") #upload world bank regions
+
+names(wgi_df)[1] <- "wb_code" #change names to easy the merge
+
+wgi_df<-wgi_df%>%
+  left_join(wb_classification) #leftmerge
+
+wgi_df2019<-wgi_df%>%
+  filter(year==2019) #take values of 2019
+
+wgi_df2019_ave<- wgi_df2019%>%
+  group_by(wb_region)%>%  
+  filter(!is.na(wb_region))%>% 
+ summarise(ave_cce=mean(cce,na.rm=T), ave_rle=mean(rle,na.rm = T))
+
+Data_03 <- read_excel("Data_03.xlsx")
+Korea_data <- read_excel("Korea_data.xlsx")
+```
+
+
+# 1. What does plotly do and why use it?
+
+In simple words, <i>plotly</i> is used to design interactive graphs on R. 
+
+Interactive graphs are useful for having a deeper understanding of the patterns and 
+behavior of data. Many times, the only way to make sense of complex data is to let the users play and interact directly with graphs. Through this, users are able to raise up meaningful questions and make sense of the information given.  
+
+
+# 2. Difference with Ggplot - the advantages.
+
+<i>Ggplot</i> provides meaningful, appealing, but <b>static</b> graphs.This latter characteristic limits the users' possibilities to <b>navigate</b> and dig further into what graph could transmit. On the other hand, <i>plotly</i> graphs allows users to <b>interact</b> on a wide variety of forms: zoom the plot, hover over a point, filter groups of categories, among others.    
+
+An example of the <b>advantages of dynamic graphs over static graphs</b> is displayed on the following examples.  As you can see in the first graph, done simply with <i>ggplot</i>, it is not possible to define exactly the value of the dots - only an approximation.  Even if the labels of the countries and its values were provided <b>the design would be too crowded </b> and would difficult its interpretation.
+
+## 2.1. Example graph with Ggplot
+
+```{r pressure}
+
+#Female employment rate and Total Fertility Rate (TFR)in 2015 with ggplot()
+
+fig <- ggplot(Data_03, mapping=aes(x=TFR, y=`Quarters 2015`,label=Country)) +
+  geom_point(shape=1, alpha=0.5) +   
+  geom_text(size=3, hjust=1, vjust=1) +
+  ggtitle("Fig 1: Women´s employment levels and fertility rate in 2015", subtitle = "Built with Ggplot") +
+  labs(y="Female employment rate", 
+       x = "TFR", 
+  caption = "Source:Eurostat Data(2021).Retrieved from: https://ec.europa.eu/eurostat & downloaded 23.09.2021")+
+  theme_minimal()
+
+fig
+
+```
+
+## 2.2. Example graph with plotly
+
+On the other hand, this same graph done with plotly neatly presents the coordinates of the points - this is the fertility rate against employment rate- and the country each dot represents.  
+
+```{r}
+
+fig1 <- Data_03%>%plot_ly(x = ~TFR, y = ~`Quarters 2015`, type = 'scatter', mode = 'markers',text=~Country, marker=list(color="green", size=10))%>%
+layout(title= "Fig 1: Women´s employment levels and fertility rate in 2015 - Built with plotly",yaxis = list(title = "Female employment rate"))
+fig1
+```
+
+One clear limitation however is the <b>lack of easiness in adding a subtitle and caption</b>, in contrast with Ggplot. 
+
+# 3. Building your first plot and main useful commands
+
+On this section we will explore the different basic elements that are needed in order to build and design <i>plotly</i> graph. These elements are the <b>layout</b> (e.g.title, subtitle)and <b>markers</b> (such as color or size).  
+
+## 3.1. Layout
+
+The layout function encompasses a series of commands that allow us to specify <b>the format and color of the axis and titles</b>. The first step to do this is by building a series lists with the desired characteristics (type family, size and color). These arguments are passed into <i>plotly</i> as a  set up. As well, the <b>color of the background</b> maybe changed directly on the layout function.
+
+Please note that the default setting up <i>plotly</i> are <b>scatterplots</b>. 
+
+```{r}
+
+p<-plot_ly(wgi_df2019, x = ~rle, y = ~cce, name = "default", text=~countryname)
+  #this builds a basic plotly graph with rule of law estimate on the x axis
+  # control of corruption on the y axis and the texts with the countrynames. 
+  # Please notice how we need to use the '~' symbol
+
+t <- list(
+  family = "Courier New",
+  size = 13,
+  color = "blue") #first list with character type, size and color
+
+t1 <- list(
+  family = "Times New Roman",
+  color = "red" #first list with character type, size and color
+)
+t2 <- list(
+  family = "Courier New",
+  size = 11,
+  color = "grey") #first list with character type, size and color
+
+
+
+p%>%layout(title= list(text = "Rule of Law estimate vs Control of Corruption"), font=t, 
+         xaxis = list(title = list(text ='Rule of Law(-.2.5 to 2.5)', font = t1)),
+         yaxis =  list(title = list(text ='Control of corruption (-2.5 to 2.5)', font = t2)),
+         plot_bgcolor='#e5ecf6')
+
+#on the font argument of each we use the different t's. The title is the only one which is set up a bit different. Also note how the background color is set using an hexcode. 
+
+
+
+```
+## 3.2. Color, shape, and size of dots
+
+When building a <i>plotly </i> scatterplot, the <b>colors of the dots</b> are defined with a default pallet of colors. The gradient of colors depends upon the "color" argument and a variable that is set to define it (similar to a factor variable). However, it is also possible to set up a different pallet by using other <b>pre-defined setups</b> or by using a vector with the specific color(s) we need.
+
+The graphs below picture the relationship between rule of law and control of corruption for different World Bank regions on 2019.  On the first, the default pallet is used; on the second, a predefined, and on the third a vector made by us. 
+
+
+```{r}
+
+wgi_df2019_ave<- wgi_df2019%>%
+  group_by(wb_region)%>%  
+  filter(!is.na(wb_region))%>% 
+ summarise(ave_cce=mean(cce,na.rm=T), ave_rle=mean(rle,na.rm = T)) #this makes a subset of with the averages for 2019 of controle of corruption and rule of lawe
+
+p <- plot_ly(wgi_df2019_ave, x  = ~ave_rle, y = ~ave_cce, color=~ave_rle)
+
+p%>%  add_markers(color = ~wb_region) %>% #add color according to region
+layout(title = "Rule of Law estimate vs Control of Corruption (with default color)",
+  yaxis = list(title = "Control of corruption (-2.5 to 2.5)"),
+  xaxis = list(title ="Rule of Law(-.2.5 to 2.5)"))
+
+#with our own colors
+col2 <- viridisLite::inferno(7) #this is the pallet
+p <- plot_ly(wgi_df2019_ave, x  = ~ave_rle, y = ~ave_cce, color=~ave_rle,colors=col2)
+#the colors argument uses the col2- our own set up colors
+
+p%>%  add_markers(color = ~wb_region) %>% #add color according to region
+layout(title = "Rule of Law estimate vs Control of Corruption (with other pallet)",
+  yaxis = list(title = "Control of corruption (-2.5 to 2.5)"),
+  xaxis = list(title ="Rule of Law(-.2.5 to 2.5)"))
+
+
+#third form
+#By using RGBA argument in color = RGBA color values are an extension of RGB color values with an alpha channel - which specifies the opacity for a color.For more explanation, visit: https://www.w3schools.com/css/css_colors_rgb.asp
+
+p <- plot_ly(wgi_df2019_ave, x  = ~ave_rle, y = ~ave_cce, color=~ave_rle, marker = list(color = 'rgba(246, 78, 139, 0.6)'))
+
+p%>%  add_markers(color = ~wb_region) %>% #add color according to region
+layout(title = "Rule of Law estimate vs Control of Corruption (with own colors)",
+  yaxis = list(title = "Control of corruption (-2.5 to 2.5)"),
+  xaxis = list(title ="Rule of Law(-.2.5 to 2.5)"))
+
+```
+## 3.3. Symbols and size 
+
+It is also possible to change the <b>symbols and the size</b> of the dots, on a very similar way than  when changing  the colors of the dots. 
+
+```{r}
+
+p <- plot_ly(wgi_df2019_ave, x  = ~ave_rle, y = ~ave_cce,  size=15) #the size argument changes the size of dots 
+
+p%>%  add_markers(symbol = ~wb_region) %>% #the symbol argument changes the according to world bank region
+layout(title = "Rule of Law estimate vs Control of Corruption (symbols and size)",
+  yaxis = list(title = "Control of corruption (-2.5 to 2.5)"),
+  xaxis = list(title ="Rule of Law(-.2.5 to 2.5)"))
+
+```
+
+# 4. Plotly for bars and lines
+
+As mentioned before, the default graphs of <i>plotly</i> are scatterplots. However, the power of <i>plotly</i> is greater and is possible to create bar and line plots too. Way beyond this <i>plotly</i> has the capacity to <b>create maps, 2d and 3d graphs, embed images </b>, and many more features that will not be mentioned in this introducing tutorial. 
+
+## 4.1. A simple barchart
+
+<b>Bar charts</b> may be specified  in the <i>type</i> argument by adding a <i>add_bar</i> marker. Either way the result is the same. On the examples below we create a bar chart that shows the number of births per month, starting on April 2019 and ending on September 2019. The first graph is simple and mainly uses the default settings, the second is more specific about the tags to use and alignment, while the third shows how to play with the colors.  
+
+```{r}
+
+#Load the data "Korea_data"
+#We are going to use the data from the Human Fertility Database to observe the increase/decline in the number of births per month during the Covid times (2019) in South Korea
+
+
+
+#By using "type" argument is possible to get the bar chart
+bar_chart2 <- Korea_data %>%plot_ly(x = ~ Month, y = ~Births, type = "bar") %>%layout(title= "Fig: South-Korea, N°of Births 2019",yaxis = list(title = "N° of Births"),xaxis = list(title ="Months")) 
+bar_chart2
+
+#it is also possible to create this same bar with add_bar
+
+bar_chart3 <- Korea_data %>%plot_ly(x = ~ Month, y = ~Births) %>%layout(title= "Fig: South-Korea, N°of Births 2019-2020 -add bar-",yaxis = list(title = "N° of Births"),xaxis = list(title ="Months")) %>% add_bars()
+bar_chart3
+
+```
+
+As you may see the latter bar chart is still simple. <i>Plotly</i> allows us to identify the numeric values for each bar by using the <i>text</i> argument and the <i>text position</i> arguments.  Also it is possible to change the <b<width</b> of the bar. In addition, the layout command allows us to modify the <b>angle</b> of the texts.  
+
+
+```{r}
+bar_chart2 <- Korea_data %>%plot_ly(x = ~ Month, y = ~Births, text= ~Births, textposition = "outside") %>%layout(title= "Fig: South-Korea, N°of Births 2019",yaxis = list(title = "N° of Births"),xaxis = list(title ="Months")) %>% add_bars(width= .7)
+
+bar_chart2%>%layout (title = "Fig: South-Korea, N°of Births 2019", xaxis =list (title="Months", zeroline =FALSE, tickangle=-90))
+
+```
+
+
+Finally, as mentioned before, it is possible not to use the default colors and <b>switch to other palette defined by the user</b>. An example may be seen on the graph below.  
+
+```{r}
+bar_chart2 <- Korea_data %>%plot_ly(x = ~ Month, y = ~Births, color=~Month) %>%layout(title= "Fig: South-Korea, N°of Births 2019",yaxis = list(title = "N° of Births"),xaxis = list(title ="Months"), showlegend= FALSE)
+bar_chart2
+```
+
+
+## 4.2.  Comparative bar charts
+
+As in Excel, it is possible to build graphs that <b>compare two different variables that use the same measurement unit</b> and therefore may be drawn with the same axis. For example, the graph below compares the <b>>number of births in Korea</b> for each month of 2019 in comparison with 2020. This is done with the function <i>add_trace</i>. Please note that in this example we also add a legend with <i>showlegend</i> specification.  
+
+```{r}
+KO_data <- read_excel("KO_data.xlsx") 
+
+bar_chart3 <- KO_data %>%plot_ly(x = ~ Month, y = ~n_2019, name = "2019", type = "bar", size = 10)%>% add_trace(y= ~n_2020, name="2020")%>%layout(title= "Fig: South-Korea, N°of Births 2019-2020",yaxis = list(title = "N° of Births"),xaxis = list(title ="Months"), showlegend= T, barmode="groups")
+bar_chart3
+
+```
+
+## 4.3. Graph a line chart
+
+<i> Plotly </i> may be configured to <b>draw line charts</b> which are useful to understand the <b>trend of a variable</b> through time. This is done by the <i>add lines</i> command. An example of this may be shown on the graph below that pictures the evolution of average corruption estimate per region according to the World Bank since 1996 to 2019. 
+
+```{r}
+cce_averages_year<-wgi_df%>%
+  group_by(wb_region,year) %>% 
+   filter(!is.na(wb_region))%>%
+   summarise(ave_cce=mean(cce,na.rm=T)) #creates a table of averages per year
+
+p<-plot_ly(cce_averages_year, x = ~year, y = ~ave_cce) %>%
+  add_lines(linetype = ~wb_region) #create a line per wb_region
+
+p%>%layout(title = "Control of Corruption per region (Average)",
+  yaxis = list(title = "Control of corruption (-2.5 worst to 2.5 better)")) #add the titles and axis name
+```
+
+# 5. Extra material
+
+If you want to <b>highlight a particular observation</b> on a the scatterplot or on a barchart it is possible to use the <i>annotations</i> argument in the layout command.For example, the graph below points out the observation with highest total fertility rate and lowest female employment rate (Turkey) out of 35 countries. This same command, with enough imagination, may be used to add captions and subtitles.
+
+
+```{r}
+fig1 <- Data_03%>%plot_ly(x = ~TFR, y = ~`Quarters 2015`, type = 'scatter', mode = 'markers',text=~Country)%>%
+layout(title= "Fig: Women´s employment levels and fertility rate in 2015<br><sup>TFR = Total Fertility Rate</sup>",yaxis = list(title = "Female employment rate"),showlegend=F, annotations = list(x =2.14, y=30, text="Highest TFR & Lowest FER"),showarrow = T, xref='paper', yref='paper',xanchor='right', yanchor='auto', xshift=0, yshift=0)
+
+
+
+fig1
+```
+
+# 6.Summary
+
+1. Plotly functions creates interactive visualizations based on data and arguments
+2. plot_ly(data, x, y,type, mode, color, size,...)
+3. 'type' specifies the type of plot or trace such as 'scatter','bar', 'heatmap', 'histogram'
+4. 'mode' specifies the mode, such as 'line', 'points' and 'markers'
+5. 'color' specifies the color of data points. By using I() function, you can create a vector for the color argument, or you can use a RGBA value in the marker function'
+6.'layout' encompasses a serie of other commands that allow to specify axis, titles, add colours, other formatting functions with plotly package'
+
+# 7. Sources
+
+This tutorial used as sources the next:
+
+a) Eurostat Data(2021).Retrieved from: https://ec.europa.eu/eurostat & downloaded 23.09.2021
+
+b) Human Fertility Database (2021). Available https://www.humanfertility.org/cgi-bin/stff.php. download 16-09-2021
+
+c) <i> Interactive web-based data visualization with R, plotly, and shiny </i> by Carson Sievert available at: https://plotly-r.com/index.html
+
+d) Guardian's database on police killings to census data from the American Community Survey (2014).Visit the following webpage:  http://github.com/fivethirtyeight/data/tree/master/police-killings
+
+
+
+
+
