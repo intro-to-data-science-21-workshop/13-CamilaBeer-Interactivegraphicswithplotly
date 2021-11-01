@@ -18,9 +18,9 @@ The goals of this tutorial are to (1) to understand the basics elements of Plotl
 
 ## Further resources
 
-[-Bar Charts | R  and Line Plots | R](https://plotly.com/r/bar-charts/)
-[-Setting the Font, Title, Legend Entries, and Axis Titles](https://plotly.com/r/figure-labels/)
-[-Preface | Interactive web-based data visualization with R, plotly, and shiny](https://plotly-r.com/preface.html)
+- [Bar Charts | R  and Line Plots | R](https://plotly.com/r/bar-charts/)
+- [Setting the Font, Title, Legend Entries, and Axis Titles](https://plotly.com/r/figure-labels/)
+- [Preface | Interactive web-based data visualization with R, plotly, and shiny](https://plotly-r.com/preface.html)
 
 ## License
 The material in this repository is made available under the MIT license.
